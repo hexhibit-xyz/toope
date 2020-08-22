@@ -1,0 +1,8 @@
+apiVersion: tokens.hexhibit.xyz/v1alpha1
+kind: Jwt
+metadata:
+  name: jwt-sample
+spec:
+  algorithm: "HS256"
+  subject: "yolo"
+  lifetime: "10m"

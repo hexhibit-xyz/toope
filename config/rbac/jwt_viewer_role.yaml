@@ -1,0 +1,20 @@
+# permissions for end users to view jwts.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jwt-viewer-role
+rules:
+- apiGroups:
+  - tokens.hexhibit.xyz
+  resources:
+  - jwts
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - tokens.hexhibit.xyz
+  resources:
+  - jwts/status
+  verbs:
+  - get
