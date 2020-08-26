@@ -35,7 +35,7 @@ import (
 )
 
 var defaultLabels = map[string]string{
-	"tokator/controlled": "true"}
+	"tokator.hexhibit.xyz/controlled": "true"}
 
 // JwtReconciler reconciles a Jwt object
 type JwtReconciler struct {
@@ -44,14 +44,23 @@ type JwtReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+type Logger struct {
+	logr.Logger
+}
+
+func (l Logger) errResult(err error, msg string) (ctrl.Result, error) {
+	l.Error(err, msg)
+	return ctrl.Result{}, err
+}
+
 // +kubebuilder:rbac:groups=tokens.hexhibit.xyz,resources=jwts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=tokens.hexhibit.xyz,resources=jwts/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;update;patch;watch;list;delete;create
 
 func (r *JwtReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("jwt", req.NamespacedName)
-	log.Info("reconclie: " + req.String())
-	// your logic here
+
+	log := Logger{r.Log.WithValues("jwt", req.NamespacedName)}
+	log.Info("reconcile: " + req.String())
 
 	ctx := context.Background()
 
@@ -60,10 +69,9 @@ func (r *JwtReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if err != nil {
 		if errors.IsNotFound(err) {
 			//Requested Object not found
-			log.Info("requested object not found, might be deleted")
-			return ctrl.Result{}, nil
+			return log.errResult(err, "requested object not found, might be deleted")
 		}
-		return ctrl.Result{}, err
+		return log.errResult(err, "")
 	}
 
 	secret := &v1.Secret{}
@@ -72,23 +80,19 @@ func (r *JwtReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 		secret, err = generateSecret(*token)
 		if err != nil {
-			log.Error(err, "failed to generate secret")
-			return ctrl.Result{}, err
+			return log.errResult(err, "failed to generate secret")
 		}
 
 		err = r.Client.Create(context.Background(), secret, &client.CreateOptions{})
 		if err != nil {
-			log.Error(err, "failed to create secret")
-			return ctrl.Result{}, err
+			return log.errResult(err, "failed to create secret")
 		}
 
 	} else if err != nil {
-		log.Error(err, "failed to get secret")
-		return ctrl.Result{}, err
+		return log.errResult(err, "failed to get secret")
 	}
 
 	now := metav1.Now()
-
 	if token.Status.Expired || token.Status.ExpiresAt.Before(&now) || token.Status.RefreshAfter.Before(&now) {
 		log.Info("token is expired, try to refresh")
 		updateSecret(*token, secret)
@@ -96,21 +100,23 @@ func (r *JwtReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		log.Info("update secret")
 		err = r.Client.Update(context.TODO(), secret, &client.UpdateOptions{})
 		if err != nil {
-			log.Error(err, "failed to update secret")
-			return ctrl.Result{}, err
+			return log.errResult(err, "failed to update secret")
 		}
 
 	}
+
 	updateRefreshStatus(token)
 
 	log.Info("update token")
 	err = r.Status().Update(ctx, token)
 	if err != nil {
-		log.Error(err, "failed to update token")
-		return ctrl.Result{}, err
+		return log.errResult(err, "failed to update token")
 	}
 
-	controllerutil.SetControllerReference(token, secret, r.Scheme)
+	err = controllerutil.SetControllerReference(token, secret, r.Scheme)
+	if err != nil {
+		return log.errResult(err, "failed to set token controller reference")
+	}
 
 	return ctrl.Result{RequeueAfter: token.Status.NextReconcile.Sub(time.Now())}, nil
 }
