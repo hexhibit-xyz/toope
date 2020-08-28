@@ -62,7 +62,7 @@ func encodeRSA(private string) (*rsa.PrivateKey, error) {
 	return x509.ParsePKCS1PrivateKey(block.Bytes)
 }
 
-func FromSecret(secret v1.Secret) (*rsa.PrivateKey, error) {
+func FromSecret(secret *v1.Secret) (*rsa.PrivateKey, error) {
 	privatePem := secret.Data[SecretKeyPrivateKey]
 	return encodeRSA(string(privatePem))
 }

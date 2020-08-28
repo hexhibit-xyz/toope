@@ -28,7 +28,8 @@ type RotatingKeySpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of RotatingKey. Edit RotatingKey_types.go to remove/update
+	//JSON Web Signature and Encryption Algorithms
+	// +kubebuilder:validation:Enum=RS256
 	Algorithm   string `json:"algorithm"`
 	RotateAfter string `json:"rotateAfter"`
 	//Token lifetime

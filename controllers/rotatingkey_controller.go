@@ -26,8 +26,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	rand2 "k8s.io/apimachinery/pkg/util/rand"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"time"
 )
 
 // RotatingKeyReconciler reconciles a RotatingKey object
@@ -54,7 +57,6 @@ func (r *RotatingKeyReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		return log.errResult(err, "")
 	}
 
-	publicKey := rotatingKey.Status.SigningKey.PublicKey
 	secret := &v1.Secret{}
 
 	// Try to fetch the secret
@@ -85,7 +87,13 @@ func (r *RotatingKeyReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		}
 
 		//Set new created public key as new verification key
-		publicKey = public
+		rotatingKey.Status.SigningKey.PublicKey = public
+		rotatingKey.Status.SigningKey.KeyID = rand2.String(20)
+		rotate, err := time.ParseDuration(rotatingKey.Spec.RotateAfter)
+		if err != nil {
+			return log.errResult(err, "unsupported duration format")
+		}
+		rotatingKey.Status.NexRotation.Time = time.Now().Add(rotate)
 
 	} else if err != nil {
 		return log.errResult(err, "failed to get secret")
@@ -98,7 +106,7 @@ func (r *RotatingKeyReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	}
 
 	nextRoation := rotatingKey.Status.NexRotation.Time
-	if metav1.Now().After(nextRoation) || rotatingKey.Status.SigningKey.PublicKey != publicKey {
+	if metav1.Now().After(nextRoation) {
 		strategy, err := crypto.NewRotationStrategy(rotatingKey.Spec.Algorithm, rotatingKey.Spec.RotateAfter, rotatingKey.Spec.Lifetime)
 		if err != nil {
 			return log.errResult(err, "failed to create strategy")
@@ -124,19 +132,27 @@ func (r *RotatingKeyReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		return log.errResult(err, "failed to update rotating key status")
 	}
 
-	return ctrl.Result{}, nil
+	err = controllerutil.SetControllerReference(rotatingKey, secret, r.Scheme)
+	if err != nil {
+		return log.errResult(err, "failed to set token controller reference")
+	}
+
+	next := rotatingKey.Status.NexRotation.Sub(time.Now()) + 1*time.Minute
+
+	return ctrl.Result{RequeueAfter: next}, nil
 }
 
 func (r *RotatingKeyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&tokensv1alpha1.RotatingKey{}).
+		Owns(&v1.Secret{}).
 		Complete(r)
 }
 
 func StatusToKeys(key *tokensv1alpha1.RotatingKey, secret *v1.Secret) (crypto.Keys, error) {
 	vks := key.Status.VerificationKeys
 
-	privateKey, err := crypto.FromSecret(*secret)
+	privateKey, err := crypto.FromSecret(secret)
 	if err != nil {
 		return crypto.Keys{}, err
 	}
@@ -152,6 +168,7 @@ func StatusToKeys(key *tokensv1alpha1.RotatingKey, secret *v1.Secret) (crypto.Ke
 		keys[i] = crypto.VerificationKey{
 			PublicKey: *pub,
 			Expiry:    k.ExpireAt.Time,
+			Kid:       k.KeyID,
 		}
 	}
 
@@ -159,6 +176,7 @@ func StatusToKeys(key *tokensv1alpha1.RotatingKey, secret *v1.Secret) (crypto.Ke
 		SigningKey:       privateKey,
 		VerificationKeys: keys,
 		NextRotation:     key.Status.NexRotation.Time,
+		SigningKid:       key.Status.SigningKey.KeyID,
 	}, nil
 
 }

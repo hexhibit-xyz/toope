@@ -1,8 +1,9 @@
 apiVersion: tokens.hexhibit.xyz/v1alpha1
 kind: RotatingKey
 metadata:
-  name: rotatingkey-sample
+  name: rot1
+  namespace: default
 spec:
-  algorithm: ""
+  algorithm: "RS256"
   rotateAfter: "5m"
   lifetime: "1m"

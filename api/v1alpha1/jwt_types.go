@@ -28,19 +28,24 @@ type JwtSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	//JSON Web Signature and Encryption Algorithms
-	// +kubebuilder:validation:Enum=HS256;RS256;ES256
-	Algorithm string `json:"algorithm"`
 	//Subject set in token
 	Subject string `json:"subject"`
-	//Token lifetime
-	Lifetime string `json:"lifetime"`
+
+	RotatingKeyRef RotatingKeyRef `json:"rotatingKeyRef"`
+}
+
+type RotatingKeyRef struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
 }
 
 // JwtStatus defines the observed state of Jwt
 type JwtStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	//Token lifetime
+	Algorithm          string       `json:"algorithm"`
+	Lifetime           string       `json:"lifetime"`
 	Expired            bool         `json:"expired"`
 	ExpiresAt          metav1.Time  `json:"expiresAt"`
 	RefreshAfter       metav1.Time  `json:"refreshAfter"`

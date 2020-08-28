@@ -5,4 +5,6 @@ metadata:
 spec:
   algorithm: "HS256"
   subject: "yolo"
-  lifetime: "10m"
+  rotatingKeyRef:
+    name: rot1
+    namespace: default

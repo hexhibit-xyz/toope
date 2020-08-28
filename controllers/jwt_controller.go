@@ -18,9 +18,9 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/go-logr/logr"
+	"github.com/hexhibit/tokator/crypto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,11 +74,27 @@ func (r *JwtReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return log.errResult(err, "")
 	}
 
+	rotatingKey := &tokensv1alpha1.RotatingKey{}
+	err = r.Client.Get(ctx, req.NamespacedName, rotatingKey)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			//Requested Object not found
+			return log.errResult(err, "requested rotatingKey object not found, might be deleted")
+		}
+		return log.errResult(err, "")
+	}
+
 	secret := &v1.Secret{}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: token.Name, Namespace: token.Namespace}, secret)
 	if err != nil && errors.IsNotFound(err) {
 
-		secret, err = generateSecret(*token)
+		privateKey := &v1.Secret{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: rotatingKey.Name, Namespace: rotatingKey.Namespace}, privateKey)
+		if err != nil {
+			return log.errResult(err, "failed to get private key secret")
+		}
+
+		secret, err = generateSecret(token, rotatingKey.Spec, privateKey)
 		if err != nil {
 			return log.errResult(err, "failed to generate secret")
 		}
@@ -129,7 +145,7 @@ func updateRefreshStatus(token *tokensv1alpha1.Jwt) {
 		creationDate = *token.Status.LastRefresh
 	}
 
-	lifetime, err := time.ParseDuration(token.Spec.Lifetime)
+	lifetime, err := time.ParseDuration("1m")
 	if err != nil {
 		lifetime = 10 * time.Minute
 	}
@@ -148,16 +164,18 @@ func updateRefreshStatus(token *tokensv1alpha1.Jwt) {
 	}
 }
 
-func generateSecret(jwt tokensv1alpha1.Jwt) (secret *v1.Secret, err error) {
+func generateSecret(jwt *tokensv1alpha1.Jwt, spec tokensv1alpha1.RotatingKeySpec, privateKey *v1.Secret) (secret *v1.Secret, err error) {
 
-	alog := jwt.Spec.Algorithm
-	if alog == "" {
-		return secret, fmt.Errorf("no signing algorithm set")
+	private, err := crypto.FromSecret(privateKey)
+	if err != nil {
+		return
 	}
 
-	a := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.MapClaims{})
+	signingMethod := jwtgo.GetSigningMethod(spec.Algorithm)
 
-	token, err := a.SignedString([]byte("secret"))
+	a := jwtgo.NewWithClaims(signingMethod, jwtgo.MapClaims{})
+
+	token, err := a.SignedString(private)
 	if err != nil {
 		return secret, err
 	}

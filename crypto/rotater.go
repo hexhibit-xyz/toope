@@ -85,7 +85,6 @@ func (k keyRotater) Rotate(keys *Keys) error {
 
 	// Generate the keyGenFunc outside of a storage transaction.
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	keys.SigningKid = rand2.String(20)
 
 	if err != nil {
 		return fmt.Errorf("generate keyGenFunc: %v", err)
@@ -128,6 +127,7 @@ func (k keyRotater) Rotate(keys *Keys) error {
 		keys.VerificationKeys = append(keys.VerificationKeys, verificationKey)
 	}
 
+	keys.SigningKid = rand2.String(20)
 	nextRotation = time.Now().Add(k.strategy.rotationFrequency)
 	keys.SigningKey = key
 	keys.NextRotation = nextRotation
