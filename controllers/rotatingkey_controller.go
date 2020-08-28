@@ -54,7 +54,7 @@ func (r *RotatingKeyReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		return log.errResult(err, "")
 	}
 
-	publicKey := ""
+	publicKey := rotatingKey.Status.SigningKey.PublicKey
 	secret := &v1.Secret{}
 
 	// Try to fetch the secret
@@ -71,7 +71,14 @@ func (r *RotatingKeyReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		}
 
 		//Decode the private key and create a new secret
-		secret = crypto.DecodedToSecret(private)
+		secret = &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      rotatingKey.Name,
+				Namespace: rotatingKey.Namespace,
+			},
+			Type: "Opaque",
+		}
+		crypto.DecodedToSecret(private, secret)
 		err = r.Client.Create(context.Background(), secret, &client.CreateOptions{})
 		if err != nil {
 			return log.errResult(err, "failed to create secret")
@@ -103,7 +110,7 @@ func (r *RotatingKeyReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 			return log.errResult(err, "failed to rotate")
 		}
 
-		secret = crypto.ToSecret(cryptoKeys.SigningKey)
+		crypto.ToSecret(cryptoKeys.SigningKey, secret)
 		err = r.Update(ctx, secret)
 		if err != nil {
 			return log.errResult(err, "failed to update secret with new private key")
@@ -164,12 +171,12 @@ func KeysToStatus(keys crypto.Keys) tokensv1alpha1.RotatingKeyStatus {
 			KeyID:     k.Kid,
 			Use:       "enc",
 			PublicKey: crypto.DecodeRSAPublic(k.PublicKey),
-			ExpireAt:  metav1.Time{},
+			ExpireAt:  metav1.NewTime(k.Expiry),
 		}
 	}
 
 	return tokensv1alpha1.RotatingKeyStatus{
-		NexRotation:      metav1.Time{},
+		NexRotation:      metav1.NewTime(keys.NextRotation),
 		VerificationKeys: valK,
 		SigningKey: tokensv1alpha1.SigningKey{
 			KeyID:     keys.SigningKid,

@@ -46,7 +46,7 @@ func EncodePublicRSA(public string) (*rsa.PublicKey, error) {
 
 	block, _ := pem.Decode([]byte(public))
 	if block == nil || block.Type != BlockTypePublic {
-		return nil, fmt.Errorf("failed to decode PEM block containing public key, block type found '%s'", block.Type)
+		return nil, fmt.Errorf("failed to decode PEM block containing public key")
 	}
 
 	return x509.ParsePKCS1PublicKey(block.Bytes)
@@ -56,26 +56,24 @@ func encodeRSA(private string) (*rsa.PrivateKey, error) {
 
 	block, _ := pem.Decode([]byte(private))
 	if block == nil || block.Type != BlockTypePrivate {
-		return nil, fmt.Errorf("failed to decode PEM block containing private key, block type found '%s'", block.Type)
+		return nil, fmt.Errorf("failed to decode PEM block containing private key")
 	}
 
 	return x509.ParsePKCS1PrivateKey(block.Bytes)
 }
 
 func FromSecret(secret v1.Secret) (*rsa.PrivateKey, error) {
-	privatePem := secret.StringData[SecretKeyPrivateKey]
-	return encodeRSA(privatePem)
+	privatePem := secret.Data[SecretKeyPrivateKey]
+	return encodeRSA(string(privatePem))
 }
 
-func ToSecret(key *rsa.PrivateKey) *v1.Secret {
+func ToSecret(key *rsa.PrivateKey, secret *v1.Secret) {
 	priv, _ := decodeRSA(key)
-	return DecodedToSecret(priv)
+	DecodedToSecret(priv, secret)
 }
 
-func DecodedToSecret(private string) *v1.Secret {
-	return &v1.Secret{
-		StringData: map[string]string{SecretKeyPrivateKey: private},
-	}
+func DecodedToSecret(private string, secret *v1.Secret) {
+	secret.StringData = map[string]string{SecretKeyPrivateKey: private}
 }
 
 func CreateKeys() (private, public string, err error) {

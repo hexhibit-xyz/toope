@@ -38,3 +38,23 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - tokens.hexhibit.xyz
+  resources:
+  - rotatingkeys
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - tokens.hexhibit.xyz
+  resources:
+  - rotatingkeys/status
+  verbs:
+  - get
+  - patch
+  - update
