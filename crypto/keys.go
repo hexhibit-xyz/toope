@@ -31,6 +31,27 @@ func decodeRSA(key *rsa.PrivateKey) (private string, public string) {
 	return
 }
 
+func DecodeRSAPublic(key rsa.PublicKey) (public string) {
+	public = string(pem.EncodeToMemory(
+		&pem.Block{
+			Type:  BlockTypePublic,
+			Bytes: x509.MarshalPKCS1PublicKey(&key),
+		},
+	))
+
+	return
+}
+
+func EncodePublicRSA(public string) (*rsa.PublicKey, error) {
+
+	block, _ := pem.Decode([]byte(public))
+	if block == nil || block.Type != BlockTypePublic {
+		return nil, fmt.Errorf("failed to decode PEM block containing public key, block type found '%s'", block.Type)
+	}
+
+	return x509.ParsePKCS1PublicKey(block.Bytes)
+}
+
 func encodeRSA(private string) (*rsa.PrivateKey, error) {
 
 	block, _ := pem.Decode([]byte(private))

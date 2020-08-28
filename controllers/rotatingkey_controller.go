@@ -18,18 +18,16 @@ package controllers
 
 import (
 	"context"
+	"github.com/go-logr/logr"
+	tokensv1alpha1 "github.com/hexhibit/tokator/api/v1alpha1"
 	"github.com/hexhibit/tokator/crypto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	tokensv1alpha1 "github.com/hexhibit/tokator/api/v1alpha1"
 )
 
 // RotatingKeyReconciler reconciles a RotatingKey object
@@ -59,7 +57,10 @@ func (r *RotatingKeyReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	publicKey := ""
 	secret := &v1.Secret{}
 
+	// Try to fetch the secret
+	// containing the private signing key
 	err = r.Client.Get(ctx, types.NamespacedName{Name: rotatingKey.Name, Namespace: rotatingKey.Namespace}, secret)
+	//If not found, create new keys
 	if err != nil && errors.IsNotFound(err) {
 
 		log.Info("keys not found, create new")
@@ -69,33 +70,52 @@ func (r *RotatingKeyReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 			return log.errResult(err, "failed to create keys")
 		}
 
+		//Decode the private key and create a new secret
 		secret = crypto.DecodedToSecret(private)
-
-		if err != nil {
-			return log.errResult(err, "failed to generate secret")
-		}
-
 		err = r.Client.Create(context.Background(), secret, &client.CreateOptions{})
 		if err != nil {
 			return log.errResult(err, "failed to create secret")
 		}
 
+		//Set new created public key as new verification key
 		publicKey = public
 
 	} else if err != nil {
 		return log.errResult(err, "failed to get secret")
 	}
 
-	if rotatingKey.Status.SigningKey.PublicKey != publicKey {
-		//TODO
+	//Create key set from status
+	cryptoKeys, err := StatusToKeys(rotatingKey, secret)
+	if err != nil {
+		return log.errResult(err, "failed to convert to crypto keys")
 	}
 
 	nextRoation := rotatingKey.Status.NexRotation.Time
-	if metav1.Now().After(nextRoation) {
-		//rotate
+	if metav1.Now().After(nextRoation) || rotatingKey.Status.SigningKey.PublicKey != publicKey {
+		strategy, err := crypto.NewRotationStrategy(rotatingKey.Spec.Algorithm, rotatingKey.Spec.RotateAfter, rotatingKey.Spec.Lifetime)
+		if err != nil {
+			return log.errResult(err, "failed to create strategy")
+		}
+
+		rotator := crypto.NewRotater(strategy)
+		err = rotator.Rotate(&cryptoKeys)
+		if err != nil {
+			return log.errResult(err, "failed to rotate")
+		}
+
+		secret = crypto.ToSecret(cryptoKeys.SigningKey)
+		err = r.Update(ctx, secret)
+		if err != nil {
+			return log.errResult(err, "failed to update secret with new private key")
+		}
 	}
 
-	// your logic here
+	rotatingKey.Status = KeysToStatus(cryptoKeys)
+
+	err = r.Status().Update(ctx, rotatingKey)
+	if err != nil {
+		return log.errResult(err, "failed to update rotating key status")
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -106,6 +126,55 @@ func (r *RotatingKeyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func generateKeySecret() {
+func StatusToKeys(key *tokensv1alpha1.RotatingKey, secret *v1.Secret) (crypto.Keys, error) {
+	vks := key.Status.VerificationKeys
 
+	privateKey, err := crypto.FromSecret(*secret)
+	if err != nil {
+		return crypto.Keys{}, err
+	}
+
+	keys := make([]crypto.VerificationKey, len(vks))
+	for i, k := range vks {
+
+		pub, err := crypto.EncodePublicRSA(k.PublicKey)
+		if err != nil {
+			return crypto.Keys{}, err
+		}
+
+		keys[i] = crypto.VerificationKey{
+			PublicKey: *pub,
+			Expiry:    k.ExpireAt.Time,
+		}
+	}
+
+	return crypto.Keys{
+		SigningKey:       privateKey,
+		VerificationKeys: keys,
+		NextRotation:     key.Status.NexRotation.Time,
+	}, nil
+
+}
+
+func KeysToStatus(keys crypto.Keys) tokensv1alpha1.RotatingKeyStatus {
+	valK := make([]tokensv1alpha1.ValidationKey, len(keys.VerificationKeys))
+
+	for i, k := range keys.VerificationKeys {
+		valK[i] = tokensv1alpha1.ValidationKey{
+			KeyID:     k.Kid,
+			Use:       "enc",
+			PublicKey: crypto.DecodeRSAPublic(k.PublicKey),
+			ExpireAt:  metav1.Time{},
+		}
+	}
+
+	return tokensv1alpha1.RotatingKeyStatus{
+		NexRotation:      metav1.Time{},
+		VerificationKeys: valK,
+		SigningKey: tokensv1alpha1.SigningKey{
+			KeyID:     keys.SigningKid,
+			Use:       "sig",
+			PublicKey: crypto.DecodeRSAPublic(keys.SigningKey.PublicKey),
+		},
+	}
 }

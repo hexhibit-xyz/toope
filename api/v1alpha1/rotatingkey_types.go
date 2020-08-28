@@ -31,15 +31,17 @@ type RotatingKeySpec struct {
 	// Foo is an example field of RotatingKey. Edit RotatingKey_types.go to remove/update
 	Algorithm   string `json:"algorithm"`
 	RotateAfter string `json:"rotateAfter"`
+	//Token lifetime
+	Lifetime string `json:"lifetime"`
 }
 
 // RotatingKeyStatus defines the observed state of RotatingKey
 type RotatingKeyStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	NexRotation    metav1.Time     `json:"nextRotation"`
-	ValidationKeys []ValidationKey `json:"validationKeys"`
-	SigningKey     SigningKey      `json:"signingKeys"`
+	NexRotation      metav1.Time     `json:"nextRotation"`
+	VerificationKeys []ValidationKey `json:"validationKeys"`
+	SigningKey       SigningKey      `json:"signingKeys"`
 }
 
 type ValidationKey struct {
@@ -50,10 +52,9 @@ type ValidationKey struct {
 }
 
 type SigningKey struct {
-	KeyID      string `json:"keyID"`
-	Use        string `json:"use"`
-	PublicKey  string `json:"publicKey"`
-	PrivateKey string `json:"privateKey"`
+	KeyID     string `json:"keyID"`
+	Use       string `json:"use"`
+	PublicKey string `json:"publicKey"`
 }
 
 // +kubebuilder:object:root=true

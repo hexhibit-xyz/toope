@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"github.com/sirupsen/logrus"
+	rand2 "k8s.io/apimachinery/pkg/util/rand"
 	"time"
 )
 
@@ -12,7 +13,7 @@ import (
 type Keys struct {
 	// Key for creating and verifying signatures. These may be nil.
 	SigningKey *rsa.PrivateKey
-
+	SigningKid string
 	// Old signing keys which have been rotated but can still be used to validate
 	// existing signatures.
 	VerificationKeys []VerificationKey
@@ -28,6 +29,7 @@ type Keys struct {
 type VerificationKey struct {
 	PublicKey rsa.PublicKey
 	Expiry    time.Time
+	Kid       string
 }
 
 type keyRotater struct {
@@ -52,10 +54,21 @@ type AsymmetricAlg interface {
 	Public() AsymmetricAlg
 }
 
-func NewRotationStrategy(algorithm string, rotationFrequency, idTokenValidFor time.Duration) (rotationStrategy, error) {
+func NewRotationStrategy(algorithm string, rotationFrequency, idTokenValidFor string) (rotationStrategy, error) {
+
+	rf, err := time.ParseDuration(rotationFrequency)
+	if err != nil {
+		return rotationStrategy{}, err
+	}
+
+	validFor, err := time.ParseDuration(idTokenValidFor)
+	if err != nil {
+		return rotationStrategy{}, err
+	}
+
 	return rotationStrategy{
-		rotationFrequency: rotationFrequency,
-		idTokenValidFor:   idTokenValidFor,
+		rotationFrequency: rf,
+		idTokenValidFor:   validFor,
 		algorithm:         algorithm,
 	}, nil
 }
@@ -67,11 +80,12 @@ func NewRotater(strategy rotationStrategy) keyRotater {
 	}
 }
 
-func (k keyRotater) rotate(keys *Keys) error {
+func (k keyRotater) Rotate(keys *Keys) error {
 	k.logger.Infof("keys expired, rotating")
 
 	// Generate the keyGenFunc outside of a storage transaction.
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	keys.SigningKid = rand2.String(20)
 
 	if err != nil {
 		return fmt.Errorf("generate keyGenFunc: %v", err)
@@ -109,6 +123,7 @@ func (k keyRotater) rotate(keys *Keys) error {
 			// verification keyGenFunc won't expire until all ID Tokens it's signed
 			// expired as well.
 			Expiry: tNow.Add(k.strategy.idTokenValidFor),
+			Kid:    keys.SigningKid,
 		}
 		keys.VerificationKeys = append(keys.VerificationKeys, verificationKey)
 	}
