@@ -1,4 +1,4 @@
-module gitlab.com/hexhibit/toope
+module github.com/hexhibit-xyz/toope
 
 go 1.13
 

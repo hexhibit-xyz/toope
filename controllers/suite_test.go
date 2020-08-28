@@ -30,7 +30,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	tokensv1alpha1 "gitlab.com/hexhibit/toope/api/v1alpha1"
+	tokensv1alpha1 "github.com/hexhibit-xyz/toope/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 

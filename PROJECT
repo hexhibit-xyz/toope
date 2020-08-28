@@ -1,6 +1,6 @@
 domain: hexhibit.xyz
 layout: go.kubebuilder.io/v2
-repo: gitlab.com/hexhibit/toope
+repo: github.com/hexhibit-xyz/toope
 resources:
 - group: tokens
   kind: Jwt

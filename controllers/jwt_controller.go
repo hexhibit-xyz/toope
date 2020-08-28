@@ -20,7 +20,7 @@ import (
 	"context"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/go-logr/logr"
-	"gitlab.com/hexhibit/toope/crypto"
+	"github.com/hexhibit-xyz/toope/crypto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
-	tokensv1alpha1 "gitlab.com/hexhibit/toope/api/v1alpha1"
+	tokensv1alpha1 "github.com/hexhibit-xyz/toope/api/v1alpha1"
 )
 
 var defaultLabels = map[string]string{
