@@ -1,0 +1,7 @@
+apiVersion: tokens.hexhibit.xyz/v1alpha1
+kind: RotatingKey
+metadata:
+  name: rotatingkey-sample
+spec:
+  # Add fields here
+  foo: bar

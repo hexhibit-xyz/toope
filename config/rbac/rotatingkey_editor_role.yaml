@@ -1,0 +1,24 @@
+# permissions for end users to edit rotatingkeys.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rotatingkey-editor-role
+rules:
+- apiGroups:
+  - tokens.hexhibit.xyz
+  resources:
+  - rotatingkeys
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - tokens.hexhibit.xyz
+  resources:
+  - rotatingkeys/status
+  verbs:
+  - get

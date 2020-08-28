@@ -1,0 +1,20 @@
+# permissions for end users to view rotatingkeys.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rotatingkey-viewer-role
+rules:
+- apiGroups:
+  - tokens.hexhibit.xyz
+  resources:
+  - rotatingkeys
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - tokens.hexhibit.xyz
+  resources:
+  - rotatingkeys/status
+  verbs:
+  - get
