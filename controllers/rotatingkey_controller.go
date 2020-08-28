@@ -19,8 +19,8 @@ package controllers
 import (
 	"context"
 	"github.com/go-logr/logr"
-	tokensv1alpha1 "github.com/hexhibit/tokator/api/v1alpha1"
-	"github.com/hexhibit/tokator/crypto"
+	tokensv1alpha1 "gitlab.com/hexhibit/toope/api/v1alpha1"
+	"gitlab.com/hexhibit/toope/crypto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

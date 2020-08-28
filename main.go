@@ -27,8 +27,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	tokensv1alpha1 "github.com/hexhibit/tokator/api/v1alpha1"
-	"github.com/hexhibit/tokator/controllers"
+	tokensv1alpha1 "gitlab.com/hexhibit/toope/api/v1alpha1"
+	"gitlab.com/hexhibit/toope/controllers"
 	// +kubebuilder:scaffold:imports
 )
 

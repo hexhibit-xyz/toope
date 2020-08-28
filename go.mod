@@ -1,4 +1,4 @@
-module github.com/hexhibit/tokator
+module gitlab.com/hexhibit/toope
 
 go 1.13
 

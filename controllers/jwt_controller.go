@@ -20,7 +20,7 @@ import (
 	"context"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/go-logr/logr"
-	"github.com/hexhibit/tokator/crypto"
+	"gitlab.com/hexhibit/toope/crypto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
-	tokensv1alpha1 "github.com/hexhibit/tokator/api/v1alpha1"
+	tokensv1alpha1 "gitlab.com/hexhibit/toope/api/v1alpha1"
 )
 
 var defaultLabels = map[string]string{
@@ -121,7 +121,12 @@ func (r *JwtReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	}
 
-	updateRefreshStatus(token)
+	lifetime, err := time.ParseDuration(rotatingKey.Spec.Lifetime)
+	if err != nil {
+		return log.errResult(err, "failed to parse lifetime")
+	}
+
+	updateRefreshStatus(token, lifetime, rotatingKey.Spec.Algorithm)
 
 	log.Info("update token")
 	err = r.Status().Update(ctx, token)
@@ -137,7 +142,7 @@ func (r *JwtReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{RequeueAfter: token.Status.NextReconcile.Sub(time.Now())}, nil
 }
 
-func updateRefreshStatus(token *tokensv1alpha1.Jwt) {
+func updateRefreshStatus(token *tokensv1alpha1.Jwt, lifetime time.Duration, algorithm string) {
 
 	now := metav1.Now()
 	creationDate := now
@@ -145,16 +150,13 @@ func updateRefreshStatus(token *tokensv1alpha1.Jwt) {
 		creationDate = *token.Status.LastRefresh
 	}
 
-	lifetime, err := time.ParseDuration("1m")
-	if err != nil {
-		lifetime = 10 * time.Minute
-	}
-
 	expAt := creationDate.Add(lifetime)
 	refAfter := creationDate.Add(lifetime * 7 / 10.0)
 	nextReconcile := creationDate.Add(lifetime * 8 / 10.0)
 
 	token.Status = tokensv1alpha1.JwtStatus{
+		Algorithm:          algorithm,
+		Lifetime:           algorithm,
 		Expired:            false,
 		ExpiresAt:          metav1.NewTime(expAt),
 		RefreshAfter:       metav1.NewTime(refAfter),

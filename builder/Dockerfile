@@ -10,4 +10,4 @@ RUN chmod +x operator-sdk-v1.0.0-x86_64-linux-gnu &&  mkdir -p /usr/local/bin/ &
 
 RUN chmod +x helm-operator-v1.0.0-x86_64-linux-gnu &&  mkdir -p /usr/local/bin/ &&  cp helm-operator-v1.0.0-x86_64-linux-gnu /usr/local/bin/helm-operator && rm helm-operator-v1.0.0-x86_64-linux-gnu
 
-WORKDIR /hexhibit/tokator
+WORKDIR /hexhibit/toope

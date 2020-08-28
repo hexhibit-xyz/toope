@@ -3,7 +3,6 @@ kind: Jwt
 metadata:
   name: jwt-sample
 spec:
-  algorithm: "HS256"
   subject: "yolo"
   rotatingKeyRef:
     name: rot1
